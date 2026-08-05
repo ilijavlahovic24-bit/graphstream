@@ -1,6 +1,3 @@
-[package]
-name = "GraphStream"
-edition = "2024"
 [workspace]
 members = [
     "crates/engine",
@@ -9,7 +6,8 @@ members = [
     "crates/tql_parser",
     "crates/visualization"
 ]
-[dependencies]
+resolver = "2"
+[workspace.dependencies]
 tokio     = { version = "1", features = ["full"] }
 clap = { version = "4.6.1", features = ["derive"] }
 tracing = "0.1.44"
