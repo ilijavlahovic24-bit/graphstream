@@ -1,8 +1,8 @@
 use tracing_subscriber::fmt::init;
 use clap::Parser;
 use tracing::info;
-
-
+use engine::Engine;
+use temporal_graph::TemporalGraph;
 #[derive(Parser)]
 struct Config {
     /// Port that GraphStream listens
@@ -27,7 +27,7 @@ struct Config {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Logging initialisation
-    tracing_subscriber::init();
+    tracing_subscriber::fmt::init();
 
     let config = Config::parse();
 
