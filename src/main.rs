@@ -1,3 +1,4 @@
+use tracing_subscriber::fmt::init;
 use clap::Parser;
 use tracing::info;
 
@@ -20,6 +21,8 @@ struct Config {
     #[arg(long, default_value = "false")]
     visualization: bool,
 }
+
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
