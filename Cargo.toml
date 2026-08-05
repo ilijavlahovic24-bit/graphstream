@@ -1,0 +1,16 @@
+[package]
+name = "GraphStream"
+edition = "2024"
+[workspace]
+members = [
+    "crates/engine",
+    "crates/interval", "crates/query",
+    "crates/temporal_graph",
+    "crates/tql_parser",
+    "crates/visualization"
+]
+[dependencies]
+tokio     = { version = "1", features = ["full"] }
+clap = { version = "4.6.1", features = ["derive"] }
+tracing = "0.1.44"
+anyhow = "1.0.104"

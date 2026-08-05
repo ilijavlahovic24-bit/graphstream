@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="EMPTY_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/engine/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/interval/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/parser/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/temporal_graph/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tql_parser/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/visualization/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/query/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/engine/target" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/interval/target" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/parser/target" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/temporal_graph/target" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/tql_parser/target" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/visualization/target" />
+      <excludeFolder url="file://$MODULE_DIR$/doc/Resources" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
