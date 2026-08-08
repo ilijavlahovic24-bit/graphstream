@@ -130,6 +130,7 @@ All architectural decisions are documented in `docs/adr/`. Key decisions:
 
 ## References and Documentation
 1. [Granite: A distributed engine for scalable path queries over temporal property graphs - Cormode et al., 2021] - related work, distributed temporal graph queries
-2. [Maintaining Knowledge about Temporal Intervals - Allen, 1983] - theoretical foundation for TQL temporal operators
-3. [Computational Geometry: Algorithms and Applications - de Berg et al.] - Augmented Interval Tree (Chapter 10)
-4. [The Rust Programming Language - https://doc.rust-lang.org/book/]
+2. [AN INTRODUCTION TO TEMPORAL GRAPHS: AN ALGORITHMIC PERSPECTIVE] Othon Michail1- secondary reference
+3. [Maintaining Knowledge about Temporal Intervals - Allen, 1983] - theoretical foundation for TQL temporal operators
+4. [Computational Geometry: Algorithms and Applications - de Berg et al.] - Augmented Interval Tree (Chapter 10)
+5. [The Rust Programming Language - https://doc.rust-lang.org/book/]
