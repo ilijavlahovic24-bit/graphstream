@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use chrono::NaiveDateTime;
 struct Interval{
     start_time:NaiveDateTime,
@@ -8,6 +6,7 @@ struct Interval{
 struct IntervalTreeNode {
     i:Interval,
     max:u64,
-    left:RefCell<Rc<IntervalTreeNode>>,
-    right:RefCell<Rc<IntervalTreeNode>>
+    left: Option<Box<IntervalTreeNode>>,
+    right: Option<Box<IntervalTreeNode>>,
 }
+
