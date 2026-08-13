@@ -1,4 +1,3 @@
-
 use tracing_subscriber::fmt::init;
 use clap::Parser;
 use tracing::info;

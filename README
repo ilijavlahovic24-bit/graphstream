@@ -48,10 +48,12 @@ GraphStream
 ├── docs/
 │   ├── adr/             # Architecture Decision Records
 │   └── tql-grammar.ebnf # EBNF grammar specification
-├── examples/
-│   ├── lateral_movement.tql  # Cybersecurity use case
-│   ├── spoofing.tql          # Finance use case
-│   └── decay_chain.tql       # Physics use case
+├── tests/
+│   ├──unit/
+│   ├──integration
+│       ├── lateral_movement.tql  # Cybersecurity use case
+│       ├── spoofing.tql          # Finance use case
+│       └── decay_chain.tql       # Physics use case
 ├── main.rs
 └── Cargo.toml
 ```

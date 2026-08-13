@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "crates/engine",
-    "crates/interval", "crates/query",
+    "crates/interval",
     "crates/temporal_graph",
     "crates/tql_parser",
     "crates/visualization"

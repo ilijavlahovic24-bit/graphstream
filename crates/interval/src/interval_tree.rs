@@ -10,3 +10,7 @@ struct IntervalTreeNode {
     right: Option<Box<IntervalTreeNode>>,
 }
 
+struct IntervalTree {
+    root:IntervalTreeNode,
+    
+}
