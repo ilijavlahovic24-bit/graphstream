@@ -1,8 +1,10 @@
 use tracing_subscriber::fmt::init;
 use clap::Parser;
 use tracing::info;
-use engine::engine::Engine;
+use engine::engine::{Engine};
 use temporal_graph::temporal_graph::TemporalGraph;
+use query::query::QueryEngine;
+use visualization::sampler::Sampler;
 #[derive(Parser)]
 struct Config {
     /// Port that GraphStream listens
@@ -50,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
 
 
     if config.visualization {
-        let viz = visualization::realtime::Sampler::new(graph.clone());
+        let viz = visualization::Sampler::new(graph.clone());
         tokio::spawn(async move {
             viz.run().await
         });

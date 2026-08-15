@@ -1,1 +1,1 @@
-mod temporal_graph;
+pub mod temporal_graph;

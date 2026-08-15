@@ -1,3 +1,4 @@
 mod plot;
 mod renderer;
-mod sampler;
+pub mod sampler;
+pub use sampler::Sampler;

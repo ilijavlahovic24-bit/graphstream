@@ -1,9 +1,7 @@
-pub struct Sampler{
+pub struct Server{}
 
-}
-
-impl Sampler {
-    pub fn new(p0: ())-> Self{
+impl Server {
+    pub fn new(p0: u16, p1: ()) -> Self {
         todo!()
     }
     pub async fn run(&self) -> anyhow::Result<()> {

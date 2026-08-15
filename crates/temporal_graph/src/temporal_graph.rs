@@ -1,7 +1,8 @@
-struct TemporalGraph(usize);
+#[derive(Clone)]
+pub struct TemporalGraph(usize);
 
 impl TemporalGraph {
-    fn new(max_memory_mb: usize) {
+    pub fn new(max_memory_mb: usize) {
         todo!()
     }
 }
