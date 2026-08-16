@@ -19,7 +19,7 @@ struct IntervalTreeNode {
 }
 
 impl IntervalTreeNode {
-    fn new(i:Interval,max:u64) -> Self {
+    fn new(i:Interval,max:NaiveDateTime) -> Self {
         IntervalTreeNode{i,max,left:None,right:None}
     }
     fn add_left(&mut self, left:IntervalTreeNode){
