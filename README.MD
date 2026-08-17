@@ -37,7 +37,7 @@ let results = graph.query("
 ```
 
 ## Project Structure
-
+```
 GraphStream
 ├── crates/
 │   ├── interval/   # Augmented Interval Tree - core temporal data structure
