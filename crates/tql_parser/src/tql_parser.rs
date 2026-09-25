@@ -254,7 +254,10 @@ impl Parser {
     }
 
     fn parse_diff(&mut self) -> Result<DiffCondition, ParseError> {
-        self.expect(&TokenKind::Diff)?;
+        // Accepts DIFF and EVOLVE — same constructor, different keyword.
+        let is_evolve = self.check(&TokenKind::Evolve);
+        if is_evolve { self.advance(); } else { self.expect(&TokenKind::Diff)?; }
+
         self.expect(&TokenKind::LParen)?;
         let property = self.parse_property_ref()?;
         self.expect(&TokenKind::Comma)?;
@@ -266,8 +269,6 @@ impl Parser {
         let value = self.parse_value()?;
         Ok(DiffCondition { property, t1, t2, op, value })
     }
-
-
 
     // ---- WINDOW / HAVING ------------------------------------------------
 
