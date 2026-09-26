@@ -116,6 +116,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link",
 ]
@@ -177,6 +178,10 @@ name = "engine"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "query",
+ "temporal_graph",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -412,6 +417,9 @@ dependencies = [
 [[package]]
 name = "query"
 version = "0.1.0"
+dependencies = [
+ "temporal_graph",
+]
 
 [[package]]
 name = "quote"
@@ -564,6 +572,12 @@ dependencies = [
 [[package]]
 name = "temporal_graph"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "interval",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "thread_local"
@@ -686,6 +700,7 @@ name = "visualization"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "temporal_graph",
 ]
 
 [[package]]

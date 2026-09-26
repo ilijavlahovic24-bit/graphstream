@@ -1,13 +1,17 @@
-pub struct Query{
-    query: String,
-}
+use temporal_graph::TemporalGraph;
 
-pub struct QueryEngine{
-    queries: Query,
+use std::sync::Arc;
+
+pub struct QueryEngine {
+    graph: Arc<TemporalGraph>,
 }
 
 impl QueryEngine {
-    pub fn new(p0: ()){
-        todo!()
+    pub fn new(graph: Arc<TemporalGraph>) -> Self {
+        Self { graph }
+    }
+
+    pub fn graph(&self) -> &TemporalGraph {
+        &self.graph
     }
 }

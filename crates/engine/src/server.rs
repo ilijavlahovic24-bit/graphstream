@@ -1,10 +1,19 @@
-pub struct Server{}
+use std::sync::Arc;
+use query::QueryEngine;
+
+pub struct Server {
+    port: u16,
+    query_engine: Arc<QueryEngine>,
+}
 
 impl Server {
-    pub fn new(p0: u16, p1: ()) -> Self {
-        todo!()
+    pub fn new(port: u16, query_engine: Arc<QueryEngine>) -> Self {
+        Self { port, query_engine }
     }
+
     pub async fn run(&self) -> anyhow::Result<()> {
-        todo!()
+        // TODO
+        let _ = (&self.port, &self.query_engine);
+        Ok(())
     }
 }

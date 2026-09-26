@@ -4,4 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.104"
+temporal_graph = { path = "../temporal_graph" }
+query = { path = "../query" }
+tokio = { version = "1", features = ["rt", "macros", "net"] }
+tracing = "0.1"
+anyhow = "1"

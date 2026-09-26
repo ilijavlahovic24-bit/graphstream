@@ -34,6 +34,7 @@ struct IntervalTreeNode {
     deleted: bool,
 }
 
+#[derive(Clone, Debug)]
 pub struct IntervalTree {
     nodes: Vec<IntervalTreeNode>,
     root: Option<usize>,
@@ -52,7 +53,7 @@ impl IntervalTree {
     pub fn len(&self) -> usize { self.len }
     pub fn is_empty(&self) -> bool { self.len == 0 }
     pub fn capacity_used(&self) -> usize { self.nodes.len() }
-    fn insert(&mut self, interval:Interval){
+    pub fn insert(&mut self, interval:Interval){
         let end = interval.end_time;
         let idx = self.nodes.len();
 

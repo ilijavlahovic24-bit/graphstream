@@ -1,12 +1,18 @@
-pub struct Sampler{
+use std::sync::Arc;
+use temporal_graph::TemporalGraph;
 
+pub struct Sampler {
+    graph: Arc<TemporalGraph>,
 }
 
 impl Sampler {
-    pub fn new(p0: ())-> Self{
-        todo!()
+    pub fn new(graph: Arc<TemporalGraph>) -> Self {
+        Self { graph }
     }
+
     pub async fn run(&self) -> anyhow::Result<()> {
-        todo!()
+        // TODO
+        let _ = &self.graph;
+        Ok(())
     }
 }
