@@ -39,8 +39,8 @@ async fn main() -> anyhow::Result<()> {
         "Starting GraphStream engine"
     );
 
-    // 1) Napravi graf (mutabilan) i napuni ga iz dataseta pre nego što ga
-    //    delimo između komponenti. Ovim izbegavamo lock-ove u v1.
+    // 1) Create a graph (mutable) and load it from the dataset before you load it
+    //  share between components.
     let mut graph = TemporalGraph::new(config.max_memory_mb);
 
     if let Some(path) = &config.dataset {
@@ -48,13 +48,13 @@ async fn main() -> anyhow::Result<()> {
         engine::ingestion::load_dataset(&mut graph, path).await?;
     }
 
-    // 2) Od ovog trenutka graf je read-only i deli se kroz Arc.
+    // 2) From this moment on, the graph is read-only and is shared through Arc.
     let graph = Arc::new(graph);
 
-    // 3) Query engine dobija svoj deljeni handle.
+    // 3) Query engine gets its shared handle.
     let query_engine = Arc::new(QueryEngine::new(Arc::clone(&graph)));
 
-    // 4) Opciona vizualizacija — spawn-uje se u pozadini.
+    // 4) Optional visualization — spawns in the background.
     if config.visualization {
         let viz = Sampler::new(Arc::clone(&graph));
         tokio::spawn(async move {
@@ -63,8 +63,7 @@ async fn main() -> anyhow::Result<()> {
             }
         });
     }
-
-    // 5) Server preuzima query engine i blokira do shutdown-a.
+    // 5) The server takes over the query engine and blocks until shutdown.
     let server = engine::Server::new(config.port, query_engine);
 
     info!("GraphStream ready on port {}", config.port);
