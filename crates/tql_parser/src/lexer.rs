@@ -171,11 +171,11 @@ impl<'a> Lexer<'a> {
             "TRUE" => TokenKind::True,
             "FALSE" => TokenKind::False,
             "NULL" => TokenKind::Null,
-            "MILLISECONDS" => TokenKind::Milliseconds,
-            "SECONDS" => TokenKind::Seconds,
-            "MINUTES" => TokenKind::Minutes,
-            "HOURS" => TokenKind::Hours,
-            "DAYS" => TokenKind::Days,
+            "MILLISECOND" | "MILLISECONDS" => TokenKind::Milliseconds,
+            "SECOND"      | "SECONDS"      => TokenKind::Seconds,
+            "MINUTE"      | "MINUTES"      => TokenKind::Minutes,
+            "HOUR"        | "HOURS"        => TokenKind::Hours,
+            "DAY"         | "DAYS"         => TokenKind::Days,
             _ => TokenKind::Ident(text),
         };
         Ok(self.mk(kind, line, col))
