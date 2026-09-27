@@ -12,6 +12,7 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/tql_parser/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/visualization/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/query/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/engine/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/crates/engine/target" />
       <excludeFolder url="file://$MODULE_DIR$/crates/interval/target" />
       <excludeFolder url="file://$MODULE_DIR$/crates/parser/target" />
