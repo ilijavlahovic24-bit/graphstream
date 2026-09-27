@@ -1,0 +1,5 @@
+MATCH (a:Host)-[r1:Connection]->(b:Host)-[r2:Connection]->(c:Host)
+WHERE r1.time BEFORE r2.time
+  AND WITHIN(r1.time, r2.time) < 30 MINUTES
+  AND c.critical = true
+RETURN a, b, c

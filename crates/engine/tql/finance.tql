@@ -1,0 +1,7 @@
+MATCH (t1:Trade)-[c:CORRELATED]->(t2:Trade)
+WHERE c.correlation > 0.8
+  AND t1.exchange != t2.exchange
+  AND WITHIN(t1.time, t2.time) < 100 MILLISECONDS
+WINDOW 1 SECOND
+HAVING COUNT(*) >= 5
+RETURN t1, t2

@@ -1,0 +1,3 @@
+MATCH (parent:Particle)-[d:DECAYS_TO]->(child:Particle)
+WHERE WITHIN(parent.time, child.time) < 1.5e-12 SECONDS
+RETURN parent, SUM(child.energy) AS total_energy
