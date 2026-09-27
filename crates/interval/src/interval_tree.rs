@@ -207,6 +207,10 @@ impl IntervalTree {
             }
         }
     }
+    /// Iterate over all live intervals (arena order, not sorted).
+    pub fn iter(&self) -> impl Iterator<Item = &Interval> {
+        self.nodes.iter().filter(|n| !n.deleted).map(|n| &n.interval)
+    }
 }
 
 
