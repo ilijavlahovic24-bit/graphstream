@@ -152,49 +152,49 @@ pub struct PhysicsData {
     pub graph: TemporalGraph,
     pub chains: Vec<(NodeId, NodeId, f64, f64)>,
 }
-
 pub fn build_physics() -> PhysicsData {
     let mut g = TemporalGraph::new(64);
-
-    // 3 različita tipa decay lanaca: alpha, beta, gamma
-    // Svaki ima N parent->child ivica sa istim timestampom (simultano
-    // na ns rezoluciji, pa WITHIN < 1.5e-12 SECONDS prolazi kao 0 < 1.5e-12).
     let mut chains = Vec::new();
 
     for chain_type in 0..3 {
-        let base_ns = chain_type as i64 * 1_000_000;   // 1ms razmak između lanaca
+        let base_ms = chain_type as i64 * 10; // 10 ms razmak između lanaca
         let parent_energy = 100.0 + chain_type as f64 * 50.0;
         let child_energy  = 40.0 + chain_type as f64 * 20.0;
 
+        // Realan lanac: parent i child imaju ISTI `time` property.
         let mut pp = HashMap::new();
         pp.insert("energy".into(), json!(parent_energy));
+        pp.insert("time".into(), json!(base_ms));
         let parent = g.add_node("Particle", pp);
 
         let mut cp = HashMap::new();
         cp.insert("energy".into(), json!(child_energy));
+        cp.insert("time".into(), json!(base_ms));   // isto vreme
         let child = g.add_node("Particle", cp);
 
-        let mut ep = HashMap::new();
-        ep.insert("energy".into(), json!(child_energy));
-        // Isti ns timestamp za parent i child — diff = 0
-        g.add_edge(parent, child, "DECAYS_TO",
-                   t_ns(base_ns), t_ns(base_ns + 1000),
-                   ep).unwrap();
+        g.add_edge(
+            parent, child, "DECAYS_TO",
+            t(base_ms / 1000),
+            t(base_ms / 1000 + 1),
+            HashMap::new(),
+        ).unwrap();
 
         chains.push((parent, child, parent_energy, child_energy));
     }
 
-    // Lažni lanac: parent i child 100ns razmaknuti (WITHIN pada)
+    // Lažni lanac: parent.time = 0, child.time = 1 ms.
+    // WITHIN < 1.5e-12 s → 1e-3 < 1.5e-12 je FALSE.
     let mut pp = HashMap::new();
     pp.insert("energy".into(), json!(999.0));
+    pp.insert("time".into(), json!(0));
     let parent = g.add_node("Particle", pp);
+
     let mut cp = HashMap::new();
     cp.insert("energy".into(), json!(1.0));
+    cp.insert("time".into(), json!(1));       // 1 ms posle parent-a
     let child = g.add_node("Particle", cp);
-    let mut ep = HashMap::new();
-    ep.insert("energy".into(), json!(1.0));
-    g.add_edge(parent, child, "DECAYS_TO",
-               t_ns(0), t_ns(100_000), ep).unwrap();
+
+    g.add_edge(parent, child, "DECAYS_TO", t(0), t(1), HashMap::new()).unwrap();
 
     PhysicsData { graph: g, chains }
 }
