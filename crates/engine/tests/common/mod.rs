@@ -76,7 +76,8 @@ pub fn build_cybersecurity() -> CyberData {
 
     // Popuni do 5000 ivica šumom
     let mut next = 200usize;
-    while g.edge_count() < 5000 && next + 1 < hosts.len() {
+    let mut guard = 0usize;
+    while g.edge_count() < 5000 && guard < 50_000 {
         let a = hosts[next % hosts.len()];
         let b = hosts[(next * 7 + 3) % hosts.len()];
         if a != b {

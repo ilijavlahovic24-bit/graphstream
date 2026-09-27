@@ -378,17 +378,35 @@ impl QueryEngine {
         let has_agg = r.items.iter().any(|i| matches!(i, ReturnItem::Aggregate { .. }));
 
         let rows = if has_agg {
-            let rows_ref: Vec<&Binding> = bindings.iter().collect();
-            let cells = r.items.iter().map(|it| match it {
-                ReturnItem::Aggregate { expr, .. } => {
-                    Ok(ResultCell::Value(Value::from(self.aggregate(expr, &rows_ref)?)))
+            // Implicitni GROUP BY na svim non-aggregate kolonama.
+            let non_agg_idx: Vec<usize> = r.items.iter().enumerate()
+                .filter(|(_, it)| !matches!(it, ReturnItem::Aggregate { .. }))
+                .map(|(i, _)| i)
+                .collect();
+
+            let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
+            for (i, b) in bindings.iter().enumerate() {
+                let mut key = String::new();
+                for &idx in &non_agg_idx {
+                    let cell = self.project(b, &r.items[idx])?;
+                    key.push_str(&format!("{:?}|", cell.as_json()));
                 }
-                _ => Err(TqlError::TypeMismatch {
-                    context: "RETURN".into(),
-                    detail: "non-aggregate column mixed with aggregate".into(),
-                }),
-            }).collect::<Result<Vec<_>, _>>()?;
-            vec![Row { cells }]
+                groups.entry(key).or_default().push(i);
+            }
+
+            let mut out_rows = Vec::new();
+            for idxs in groups.values() {
+                let group: Vec<&Binding> = idxs.iter().map(|&i| &bindings[i]).collect();
+                let first = &bindings[idxs[0]];
+                let cells = r.items.iter().map(|it| match it {
+                    ReturnItem::Aggregate { expr, .. } => {
+                        Ok(ResultCell::Value(Value::from(self.aggregate(expr, &group)?)))
+                    }
+                    _ => self.project(first, it),
+                }).collect::<Result<Vec<_>, _>>()?;
+                out_rows.push(Row { cells });
+            }
+            out_rows
         } else {
             bindings.iter().map(|b| {
                 let cells = r.items.iter()
