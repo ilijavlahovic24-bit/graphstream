@@ -250,9 +250,25 @@ impl QueryEngine {
                 }
                 Some(BoundValue::Node(node_id)) => {
                     let node = self.graph.node(node_id).ok_or(TqlError::UnknownNode(node_id))?;
-                    let v = node.properties.get(&pref.property)
-                        .ok_or_else(|| TqlError::UnknownVariable(pref.property.clone()))?;
-                    self.value_to_time(v)
+
+                    // 1) Eksplicitni property na čvoru (npr. `created`, `start_time`).
+                    if let Some(v) = node.properties.get(&pref.property) {
+                        return self.value_to_time(v);
+                    }
+
+                    // 2) `node.time` — vreme incidentne ivice u istom binding-u.
+                    if pref.property == "time" {
+                        for bv in b.vars.values() {
+                            if let BoundValue::Edge(edge_id, iv) = bv {
+                                let e = self.graph.edge(*edge_id).ok_or(TqlError::UnknownEdge(*edge_id))?;
+                                if e.source == node_id || e.target == node_id {
+                                    return Ok(ResolvedTime::Instant(iv.start));
+                                }
+                            }
+                        }
+                    }
+
+                    Err(TqlError::UnknownVariable(pref.property.clone()))
                 }
                 None => Err(TqlError::UnknownVariable(pref.binding.clone())),
             },
