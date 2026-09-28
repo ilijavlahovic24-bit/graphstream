@@ -1,13 +1,26 @@
 [package]
 name = "engine"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 temporal_graph = { path = "../temporal_graph" }
 query = { path = "../query" }
-tokio = { version = "1", features = ["rt", "macros", "net"] }
+tql_parser = { path = "../tql_parser" }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "signal"] }
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = "1"
+rustyline = "14"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
+
+[[bin]]
+name = "graphstream"
+path = "src/bin/graphstream.rs"
+
+[dev-dependencies]
 chrono = "0.4"
 serde_json = "1"

@@ -1,6 +1,5 @@
-pub mod engine;
-
 pub mod ingestion;
-mod server;
+pub mod repl;
+pub mod server;
 
 pub use server::Server;
