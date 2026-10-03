@@ -1,4 +1,4 @@
-# ADR-007: Iterative implementation of Augmented Interval Tree with arena allocation
+# ADR-006: Iterative implementation of Augmented Interval Tree with arena allocation
 
 ## Status
 Accepted
