@@ -1,4 +1,4 @@
-# ADR-008: v2 - Distributed execution and Kafka ingestion
+# ADR-007: v2 - Distributed execution and Kafka ingestion
 
 ## Status
 Accepted

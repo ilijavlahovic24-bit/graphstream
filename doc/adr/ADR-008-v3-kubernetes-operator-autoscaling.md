@@ -1,4 +1,4 @@
-# ADR-009: v3 - Kubernetes operator and auto-scaling
+# ADR-008: v3 - Kubernetes operator and auto-scaling
 
 ## Status
 Accepted

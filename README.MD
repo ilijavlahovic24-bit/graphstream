@@ -135,10 +135,9 @@ All architectural decisions are documented in `docs/adr/`. Key decisions:
 - **ADR-003** — Single-node execution scope for v1
 - **ADR-004** — Use-case-driven language design
 - **ADR-005** — Query input methods and implementation order
-- **ADR-006** — Temporal functions as complement to operators (supersedes ADR-002)
-- **ADR-007** — Iterative arena-allocated Interval Tree (supersedes naive BST approach)
-- **ADR-008** — v2 distributed execution and Kafka ingestion
-- **ADR-009** — v3 Kubernetes operator and auto-scaling
+- **ADR-006** — Iterative arena-allocated Interval Tree (supersedes naive BST approach)
+- **ADR-007** — v2 distributed execution and Kafka ingestion
+- **ADR-008** — v3 Kubernetes operator and auto-scaling
 
 ## References and Documentation
 1. [Granite: A distributed engine for scalable path queries over temporal property graphs — Cormode et al., 2021] — related work, distributed temporal graph queries
