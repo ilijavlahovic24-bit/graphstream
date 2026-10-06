@@ -26,3 +26,4 @@ pub mod temporal_graph;
 pub use edge::{EdgeId, TemporalEdge};
 pub use node::{Node, NodeId};
 pub use temporal_graph::TemporalGraph;
+pub use temporal_graph::{GraphError};

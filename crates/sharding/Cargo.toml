@@ -1,0 +1,12 @@
+[package]
+name = "sharding"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+temporal_graph = { path = "../temporal_graph" }
+thiserror = "1"
+tracing = "0.1"
