@@ -19,6 +19,7 @@ pub struct ShardCluster {
     allowed_lateness: Duration,
     shards: HashMap<u32, TimeWindowShard>,
     origin: NaiveDateTime,
+    next_node_id: u64,
 }
 
 impl ShardCluster {
@@ -35,6 +36,7 @@ impl ShardCluster {
             allowed_lateness,
             shards: HashMap::new(),
             origin,
+            next_node_id: 0,
         })
     }
 
@@ -88,6 +90,8 @@ impl ShardCluster {
     }
 
     /// Route a node event to its target shard. Returns `(shard_id, node_id)`.
+    ///
+    /// Node IDs are assigned by the cluster and are unique across all shards.
     pub fn ingest_node(
         &mut self,
         ts: NaiveDateTime,
@@ -95,9 +99,14 @@ impl ShardCluster {
         properties: HashMap<String, Value>,
     ) -> Result<(u32, NodeId), ShardError> {
         let idx = self.ensure_shard(ts)?;
+        let id = NodeId(self.next_node_id);
+        self.next_node_id += 1;
         let shard = self.shards.get_mut(&idx).unwrap();
-        let node = shard.ingest_node(ts, label, properties)?;
-        Ok((idx, node))
+        shard.ingest_node_with_id(id, ts, label, properties)?;
+        Ok((idx, id))
+    }
+    pub fn next_node_id(&self) -> u64 {
+        self.next_node_id
     }
 
     /// Route an edge event to its target shard. Returns `(shard_id, edge_id)`.

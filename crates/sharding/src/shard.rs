@@ -120,6 +120,28 @@ impl TimeWindowShard {
         }
         Ok(())
     }
+    /// Ingest a node with a caller-assigned [`NodeId`].
+    ///
+    /// Used by [`ShardCluster`] to enforce cluster-wide unique node IDs
+    /// across shards. The shard itself does not track a global counter —
+    /// standalone use of `TimeWindowShard` should prefer [`ingest_node`].
+    ///
+    /// [`ShardCluster`]: crate::ShardCluster
+    /// [`ingest_node`]: Self::ingest_node
+    pub fn ingest_node_with_id(
+        &mut self,
+        id: NodeId,
+        ts: NaiveDateTime,
+        label: &str,
+        properties: HashMap<String, Value>,
+    ) -> Result<(), ShardError> {
+        self.check_time(ts)?;
+        let node = temporal_graph::Node::new(id, label).with_properties(properties);
+        self.graph.insert_node(node);
+        self.watermark.advance(ts);
+        self.events_ingested += 1;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
