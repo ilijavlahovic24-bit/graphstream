@@ -1,11 +1,14 @@
 pub mod binding;
+pub mod distributed;
+pub mod distributed_planner;
 pub mod engine;
 pub mod error;
+pub mod ext;
 pub mod result;
-mod ext;
 
+pub use distributed::DistributedQueryEngine;
+pub use distributed_planner::TimeRange;
 pub use engine::QueryEngine;
 pub use error::TqlError;
-pub use result::{QueryResult, ResultCell, Row};
-
 pub use ext::GraphQueryExt;
+pub use result::{QueryResult, ResultCell, Row};
