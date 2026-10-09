@@ -1,7 +1,7 @@
 [workspace]
 members = [
     ".",                        # dodaj root kao member
-    "crates/engine",
+    "crates/engine", "crates/ingest",
     "crates/interval", "crates/query", "crates/sharding",
     "crates/temporal_graph",
     "crates/tql_parser",
