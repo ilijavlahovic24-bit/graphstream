@@ -5,23 +5,20 @@ use std::time::Duration;
 /// Kafka consumer configuration.
 #[derive(Debug, Clone)]
 pub struct KafkaConfig {
-    /// Comma-separated broker addresses, e.g. `"localhost:9092"`.
     pub brokers: String,
-    /// Topic to consume from.
     pub topic: String,
-    /// Consumer group id.
     pub group_id: String,
-    /// Maximum number of messages to prefetch. Bounds the consumer's
-    /// internal queue; a smaller value tightens backpressure at the cost
-    /// of throughput.
     pub fetch_batch_size: usize,
-    /// If a single event takes longer than this to process, it counts
-    /// toward the backpressure streak.
     pub slow_threshold: Duration,
-    /// Number of consecutive slow events that triggers a cooldown.
     pub slow_streak_threshold: u32,
-    /// How long the consumer sleeps when backpressure is applied.
     pub cooldown: Duration,
+    /// Number of events after which offsets are committed, regardless of
+    /// elapsed time.
+    pub commit_batch_size: usize,
+    /// Maximum time between commits.
+    pub commit_interval: Duration,
+    /// How often to scan for sealed shards and evict their dedup entries.
+    pub evict_interval: Duration,
 }
 
 impl KafkaConfig {
@@ -38,6 +35,9 @@ impl KafkaConfig {
             slow_threshold: Duration::from_millis(50),
             slow_streak_threshold: 100,
             cooldown: Duration::from_millis(500),
+            commit_batch_size: 500,
+            commit_interval: Duration::from_secs(1),
+            evict_interval: Duration::from_secs(30),
         }
     }
 

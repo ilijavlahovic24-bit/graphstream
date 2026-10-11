@@ -186,7 +186,7 @@ impl IngestPipeline {
         evicted
     }
 
-   
+
 
     fn resolve_or_create(
         &mut self,
@@ -328,4 +328,39 @@ mod tests {
             assert_eq!(n.label, "Host");
         }
     }
+    #[test]
+    fn evicts_dedup_for_sealed_shard() {
+        let c = cluster();
+        let mut p = IngestPipeline::new(c.clone());
+
+        // Event at t=10 advances shard 0's watermark to t=5.
+        p.process(event("e1", "a", "b", 10, 20)).unwrap();
+        assert_eq!(p.dedup_size(), 1);
+
+        // Not sealed yet — watermark t=5 is still inside [0, 60).
+        let evicted = p.evict_sealed();
+        assert_eq!(evicted, 0);
+        assert_eq!(p.dedup_size(), 1);
+
+        // Advance watermark past window_end: event at t=80 goes to shard 1,
+        // then event at t=70 also to shard 1... but we want shard 0 sealed.
+        // We need an event whose *shard* is 0 but which advances the
+        // watermark past 60. Impossible via normal events because events
+        // beyond 60 belong to shard 1. So use a direct shard manipulation:
+        drop(p);
+        {
+            let mut g = c.write().unwrap();
+            let s = g.shard_mut(0).unwrap();
+            // Force the shard's watermark past its window.
+            s.force_advance_watermark(t_2024(120));
+        }
+        let mut p = IngestPipeline::new(c.clone());
+        // Re-insert the same event so dedup has an entry to evict.
+        p.process(event("e1", "a", "b", 10, 20)).unwrap();
+        let evicted = p.evict_sealed();
+        assert_eq!(evicted, 1);
+        assert_eq!(p.dedup_size(), 0);
+    }
+
 }
+

@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
-use rdkafka::Message;
+use rdkafka::topic_partition_list::{Offset, TopicPartitionList};
+use rdkafka::{Message};
 use tokio::time::Instant;
 
 use sharding::ShardCluster;
@@ -15,14 +17,18 @@ use crate::pipeline::IngestPipeline;
 ///
 /// ## Guarantees
 ///
-/// * **At-least-once**: offsets are committed with `CommitMode::Async`
-///   only after the event is successfully processed (or classified as a
-///   duplicate, or rejected as late — all of which are terminal).
-/// * **Poison-pill safe**: malformed payloads are logged and their offsets
-///   committed to avoid an infinite retry loop.
-/// * **Backpressure**: when `slow_streak_threshold` consecutive events
-///   take longer than `slow_threshold`, the loop sleeps for `cooldown`
-///   before resuming consumption.
+/// * **At-least-once**: offsets are committed only after the corresponding
+///   events have been successfully processed (or classified as terminal:
+///   duplicate / late / malformed).
+/// * **Batched commits**: offsets are accumulated per partition and
+///   committed when either `commit_batch_size` events have been processed
+///   or `commit_interval` has elapsed since the last commit. On crash,
+///   at most one batch is reprocessed — the dedup set handles it.
+/// * **Dedup eviction**: periodically, sealed shards are identified and
+///   their event IDs are evicted from the dedup set.
+/// * **Poison-pill safe**: malformed payloads are logged and skipped.
+/// * **Backpressure**: after `slow_streak_threshold` consecutive slow
+///   events, the loop sleeps for `cooldown`.
 pub async fn run_consumer(
     cluster: Arc<RwLock<ShardCluster>>,
     config: KafkaConfig,
@@ -39,20 +45,38 @@ pub async fn run_consumer(
     let mut pipeline = IngestPipeline::new(cluster);
     let mut slow_streak: u32 = 0;
 
+    // Batched commit state.
+    let mut pending_offsets: HashMap<(String, i32), i64> = HashMap::new();
+    let mut pending_count: usize = 0;
+    let mut last_commit = Instant::now();
+    let mut last_evict = Instant::now();
+
     loop {
-        // Backpressure: if the recent events were slow, sleep before
-        // fetching the next one. This is the explicit pause the spec
-        // requires. In addition, rdkafka's internal prefetch queue is
-        // bounded by `queued.min.messages`, so the broker side is also
-        // throttled naturally.
         if slow_streak >= config.slow_streak_threshold {
-            tracing::debug!(
-                streak = slow_streak,
-                cooldown_ms = config.cooldown.as_millis(),
-                "backpressure applied"
-            );
+            tracing::debug!(streak = slow_streak, "backpressure applied");
             tokio::time::sleep(config.cooldown).await;
             slow_streak = 0;
+        }
+
+        // Commit in batches: either enough events, or enough time has passed.
+        if pending_count >= config.commit_batch_size
+            || last_commit.elapsed() >= config.commit_interval
+        {
+            if pending_count > 0 {
+                commit_offsets(&consumer, &pending_offsets)?;
+                pending_offsets.clear();
+                pending_count = 0;
+                last_commit = Instant::now();
+            }
+        }
+
+        // Periodic dedup eviction.
+        if last_evict.elapsed() >= config.evict_interval {
+            let evicted = pipeline.evict_sealed();
+            if evicted > 0 {
+                tracing::info!(evicted, "evicted dedup entries for sealed shards");
+            }
+            last_evict = Instant::now();
         }
 
         let msg = match consumer.recv().await {
@@ -64,13 +88,16 @@ pub async fn run_consumer(
             }
         };
 
+        let partition = msg.partition();
+        let offset = msg.offset();
+        let topic = msg.topic().to_string();
+
         let payload = msg.payload().unwrap_or(&[]);
         let event: EdgeEvent = match serde_json::from_slice(payload) {
             Ok(e) => e,
             Err(e) => {
                 tracing::warn!("malformed event payload: {e}");
-                // Commit the bad message to avoid a poison-pill loop.
-                let _ = consumer.commit_message(&msg, CommitMode::Async);
+                record_offset(&mut pending_offsets, &mut pending_count, &topic, partition, offset);
                 continue;
             }
         };
@@ -80,15 +107,15 @@ pub async fn run_consumer(
         let elapsed = t0.elapsed();
 
         match outcome {
-            Ok(o) => {
-                tracing::trace!(?o, "event processed");
-                consumer
-                    .commit_message(&msg, CommitMode::Async)
-                    .map_err(IngestError::Kafka)?;
+            Ok(_) => {
+                record_offset(&mut pending_offsets, &mut pending_count, &topic, partition, offset);
             }
             Err(e) => {
+                // Do NOT record the offset; on next poll this message
+                // may be redelivered. To avoid a tight loop on a
+                // persistent error we still sleep briefly.
                 tracing::warn!("ingest failed: {e}");
-                // Do NOT commit — Kafka will redeliver.
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
         }
 
@@ -98,4 +125,37 @@ pub async fn run_consumer(
             slow_streak = 0;
         }
     }
+}
+
+fn record_offset(
+    pending: &mut HashMap<(String, i32), i64>,
+    count: &mut usize,
+    topic: &str,
+    partition: i32,
+    offset: i64,
+) {
+    // Keep the highest offset seen per partition. Offset is the offset of
+    // the message just processed; the commit should be `offset + 1`
+    // (Kafka semantics: commit the *next* offset to consume).
+    let key = (topic.to_string(), partition);
+    let entry = pending.entry(key).or_insert(offset + 1);
+    if offset + 1 > *entry {
+        *entry = offset + 1;
+    }
+    *count += 1;
+}
+
+fn commit_offsets(
+    consumer: &StreamConsumer,
+    pending: &HashMap<(String, i32), i64>,
+) -> Result<(), IngestError> {
+    let mut tpl = TopicPartitionList::new();
+    for ((topic, partition), offset) in pending {
+        tpl.add_partition_offset(topic, *partition, Offset::Offset(*offset))
+            .map_err(IngestError::Kafka)?;
+    }
+    consumer
+        .commit(&tpl, CommitMode::Async)
+        .map_err(IngestError::Kafka)?;
+    Ok(())
 }

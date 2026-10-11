@@ -142,6 +142,18 @@ impl TimeWindowShard {
         self.events_ingested += 1;
         Ok(())
     }
+    /// Force the watermark forward. **For tests only.**
+    ///
+    /// Not exposed through `ShardCluster`; production paths advance the
+    /// watermark through `ingest_*`.
+    /// Force the watermark forward. **For tests only.**
+    ///
+    /// Not exposed through `ShardCluster`; production paths advance the
+    /// watermark through `ingest_*`.
+    #[doc(hidden)]
+    pub fn force_advance_watermark(&mut self, ts: NaiveDateTime) {
+        self.watermark.advance(ts);
+    }
 }
 
 #[cfg(test)]
