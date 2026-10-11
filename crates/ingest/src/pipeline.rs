@@ -39,11 +39,14 @@ pub struct IngestStats {
 /// [`process`]: Self::process
 pub struct IngestPipeline {
     cluster: Arc<RwLock<ShardCluster>>,
-    dedup: HashSet<String>,
+    /// Maps `event_id` -> shard index that processed it.
+    dedup: HashMap<String, u32>,
     external_ids: HashMap<String, NodeId>,
     next_node_id: u64,
     node_label: String,
     stats: IngestStats,
+    /// Shards already sealed and evicted; used to skip re-scanning.
+    sealed_shards: HashSet<u32>,
 }
 
 impl IngestPipeline {
@@ -60,11 +63,12 @@ impl IngestPipeline {
             .unwrap_or(0);
         Self {
             cluster,
-            dedup: HashSet::new(),
+            dedup: HashMap::new(),
             external_ids: HashMap::new(),
             next_node_id,
             node_label: "Node".to_string(),
             stats: IngestStats::default(),
+            sealed_shards: HashSet::new(),
         }
     }
 
@@ -88,8 +92,7 @@ impl IngestPipeline {
     /// Process one event. See [`ProcessOutcome`] for possible results.
     /// Process one event. See [`ProcessOutcome`] for possible results.
     pub fn process(&mut self, event: EdgeEvent) -> Result<ProcessOutcome, IngestError> {
-        // 1) Dedup by event_id.
-        if self.dedup.contains(&event.event_id) {
+        if self.dedup.contains_key(&event.event_id) {
             self.stats.duplicates += 1;
             return Ok(ProcessOutcome::Duplicate);
         }
@@ -97,38 +100,29 @@ impl IngestPipeline {
         let start = event.start_dt();
         let end = event.end_dt();
 
-        // 2) Clone the Arc first so the write guard does not borrow `self`.
-        //    This lets us call `&mut self` methods while holding the guard.
         let cluster_arc = Arc::clone(&self.cluster);
-        let mut cluster = cluster_arc
-            .write()
+        let mut cluster = cluster_arc.write()
             .map_err(|_| IngestError::Shard(ShardError::Config("cluster lock poisoned".into())))?;
 
-        // 3) Resolve / create the source and target nodes in the shard
-        //    that will hold the edge.
         let source_id = self.resolve_or_create(&mut cluster, &event.source, start)?;
         let target_id = self.resolve_or_create(&mut cluster, &event.target, start)?;
 
-        // 4) Ingest the edge.
+        let shard_idx = cluster.shard_index(start);
+
         let result = cluster.ingest_edge(
-            start,
-            end,
-            source_id,
-            target_id,
-            &event.label,
-            event.properties,
+            start, end, source_id, target_id, &event.label, event.properties,
         );
 
         drop(cluster);
 
         match result {
             Ok(_) => {
-                self.dedup.insert(event.event_id);
+                self.dedup.insert(event.event_id, shard_idx);
                 self.stats.processed += 1;
                 Ok(ProcessOutcome::Ingested)
             }
             Err(ShardError::TooLate { .. }) => {
-                self.dedup.insert(event.event_id);
+                self.dedup.insert(event.event_id, shard_idx);
                 self.stats.late_dropped += 1;
                 Ok(ProcessOutcome::LateDropped)
             }
@@ -138,6 +132,61 @@ impl IngestPipeline {
             }
         }
     }
+    /// Evict dedup entries for sealed shards.
+    ///
+    /// A shard is sealed once its watermark passes `window_end`. At that
+    /// point, no future event can be routed to it (its window is behind
+    /// the watermark), so all event IDs recorded against it are safe to
+    /// discard.
+    ///
+    /// Returns the number of evicted entries.
+    pub fn evict_sealed(&mut self) -> usize {
+        // Collect sealed shard indices first (read lock).
+        let sealed: Vec<u32> = {
+            let cluster = match self.cluster.read() {
+                Ok(c) => c,
+                Err(_) => return 0,
+            };
+            cluster
+                .shards()
+                .filter(|s| {
+                    s.watermark()
+                        .value()
+                        .map(|w| w > s.window_end)
+                        .unwrap_or(false)
+                })
+                .map(|s| s.id)
+                .collect()
+        };
+
+        let newly_sealed: Vec<u32> = sealed
+            .into_iter()
+            .filter(|id| !self.sealed_shards.contains(id))
+            .collect();
+
+        if newly_sealed.is_empty() {
+            return 0;
+        }
+
+        let to_evict: Vec<String> = self
+            .dedup
+            .iter()
+            .filter(|(_, shard)| newly_sealed.contains(shard))
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        let evicted = to_evict.len();
+        for id in &to_evict {
+            self.dedup.remove(id);
+        }
+        for id in newly_sealed {
+            self.sealed_shards.insert(id);
+        }
+
+        evicted
+    }
+
+   
 
     fn resolve_or_create(
         &mut self,
