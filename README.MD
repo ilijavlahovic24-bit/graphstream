@@ -115,7 +115,7 @@ RETURN parent, SUM(child.energy) AS total_energy
 - ADR documentation (ADR-001 through ADR-009)
 - EBNF grammar specification (`docs/tql-grammar.md`)
 
-### v2 - Distributed execution + Kafka ingestion (Planned)
+### v2 - Distributed execution + Kafka ingestion (Complete)
 - Shard TemporalGraph by time window across nodes
 - Distributed query planner - decompose TQL queries per shard, aggregate results
 - Watermark mechanism for out-of-order event handling
