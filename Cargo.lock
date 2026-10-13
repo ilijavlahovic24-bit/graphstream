@@ -512,10 +512,12 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "metrics",
  "query",
  "rustyline",
  "serde",
  "serde_json",
+ "sharding",
  "temporal_graph",
  "tokio",
  "tql_parser",
@@ -1332,6 +1334,17 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "metrics"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "sharding",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "mime"

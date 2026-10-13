@@ -2,7 +2,7 @@
 members = [
     ".",                        # dodaj root kao member
     "crates/engine", "crates/ingest",
-    "crates/interval", "crates/k8s-operator", "crates/query", "crates/sharding",
+    "crates/interval", "crates/k8s-operator", "crates/metrics", "crates/query", "crates/sharding",
     "crates/temporal_graph",
     "crates/tql_parser",
     "crates/visualization"

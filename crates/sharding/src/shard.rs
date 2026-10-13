@@ -14,7 +14,7 @@ use crate::watermark::Watermark;
 /// inside the window are additionally gated by the shard's [`Watermark`];
 /// out-of-order events beyond the grace period are dropped and counted as
 /// `late_dropped`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TimeWindowShard {
     pub id: u32,
     pub window_start: NaiveDateTime,

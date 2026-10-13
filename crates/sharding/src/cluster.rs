@@ -13,7 +13,7 @@ use crate::shard::TimeWindowShard;
 /// an event timestamp, the cluster routes it to the shard whose half-open
 /// window `[k·window, (k+1)·window)` contains the timestamp. Shards are
 /// created lazily on first use.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ShardCluster {
     window: Duration,
     allowed_lateness: Duration,
