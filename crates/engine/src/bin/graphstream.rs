@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
-use chrono::Duration as ChronoDuration;
+use chrono::{Duration as ChronoDuration, NaiveDateTime};
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
@@ -10,6 +11,7 @@ use engine::Server;
 use query::{DistributedQueryEngine, QueryEngine};
 use sharding::ShardCluster;
 use temporal_graph::TemporalGraph;
+use visualization::{ControlAction, Mode, Sampler};
 
 #[derive(Parser)]
 #[command(name = "graphstream", version, about = "GraphStream TQL engine")]
@@ -43,6 +45,12 @@ enum Command {
         port: u16,
     },
 
+    /// Snapshot and visualization tools.
+    Viz {
+        #[command(subcommand)]
+        action: VizAction,
+    },
+
     /// Run a single shard pod (used inside the Kubernetes StatefulSet).
     ///
     /// Starts two TCP servers: the query server on `--query-port` and the
@@ -56,6 +64,44 @@ enum Command {
         shard_window_seconds: u64,
         #[arg(long, default_value = "5000")]
         allowed_lateness_ms: u64,
+    },
+}
+
+#[derive(Subcommand)]
+enum VizAction {
+    /// Print a Graphviz DOT snapshot to stdout.
+    Dot {
+        /// Timestamp: ISO 8601 (`2024-01-01T00:00:05`) or ms since epoch.
+        #[arg(long)]
+        at: Option<String>,
+    },
+
+    /// Print a JSON snapshot to stdout.
+    Json {
+        #[arg(long)]
+        at: Option<String>,
+    },
+
+    /// Serve the interactive realtime visualizer.
+    Serve {
+        #[arg(long, default_value = "7475")]
+        port: u16,
+
+        /// Initial mode: "live" or "playback".
+        #[arg(long, default_value = "playback")]
+        mode: String,
+
+        /// Initial playback speed multiplier.
+        #[arg(long, default_value = "100.0")]
+        speed: f64,
+
+        /// Start playing automatically in playback mode.
+        #[arg(long, default_value = "false")]
+        autoplay: bool,
+
+        /// Tick interval in milliseconds.
+        #[arg(long, default_value = "200")]
+        tick_ms: u64,
     },
 }
 
@@ -134,7 +180,74 @@ async fn main() -> anyhow::Result<()> {
             server.run().await
         }
 
+        Command::Viz { action } => run_viz(action, graph).await,
+
         Command::Shard { .. } => unreachable!("handled above"),
+    }
+}
+
+// ---- visualization ----------------------------------------------------
+
+async fn run_viz(action: VizAction, graph: Arc<TemporalGraph>) -> anyhow::Result<()> {
+    match action {
+        VizAction::Dot { at } => {
+            let t = parse_time_opt(at.as_deref(), &graph);
+            let snap = visualization::summary::snapshot_graph(&graph, t);
+            print!("{}", visualization::dot::render(&snap));
+            Ok(())
+        }
+
+        VizAction::Json { at } => {
+            let t = parse_time_opt(at.as_deref(), &graph);
+            let snap = visualization::summary::snapshot_graph(&graph, t);
+            println!("{}", serde_json::to_string_pretty(&snap)?);
+            Ok(())
+        }
+
+        VizAction::Serve {
+            port,
+            mode,
+            speed,
+            autoplay,
+            tick_ms,
+        } => {
+            let sampler = Arc::new(
+                Sampler::new(graph.clone())
+                    .with_tick_interval(Duration::from_millis(tick_ms))
+                    .with_default_speed(speed),
+            );
+
+            let initial_mode = if mode.eq_ignore_ascii_case("live") {
+                Mode::Live
+            } else {
+                Mode::Playback
+            };
+
+            sampler
+                .apply(ControlAction::SetMode { mode: initial_mode })
+                .map_err(|e| anyhow::anyhow!("invalid initial mode: {e}"))?;
+            sampler
+                .apply(ControlAction::SetSpeed { value: speed })
+                .map_err(|e| anyhow::anyhow!("invalid initial speed: {e}"))?;
+
+            if autoplay && initial_mode == Mode::Playback {
+                sampler
+                    .apply(ControlAction::Play)
+                    .map_err(|e| anyhow::anyhow!("autoplay failed: {e}"))?;
+            }
+
+            let addr = format!("0.0.0.0:{port}");
+            tracing::info!("visualizer running at http://localhost:{port}");
+
+            let s = sampler.clone();
+            tokio::spawn(async move {
+                if let Err(e) = s.run().await {
+                    tracing::error!("sampler stopped: {e}");
+                }
+            });
+
+            visualization::server::serve(&addr, sampler).await
+        }
     }
 }
 
@@ -273,4 +386,46 @@ async fn run_shard_query_server(
             }
         });
     }
+}
+
+// ---- helpers ----------------------------------------------------------
+
+/// Parse a time argument from `--at`:
+/// * `None` → latest timestamp seen in the graph, or wall clock if empty
+/// * integer → milliseconds since Unix epoch
+/// * ISO 8601 or `YYYY-MM-DD HH:MM:SS` → parsed timestamp
+fn parse_time_opt(s: Option<&str>, graph: &TemporalGraph) -> NaiveDateTime {
+    let Some(s) = s else {
+        return latest_or_now(graph);
+    };
+    if let Ok(ms) = s.parse::<i64>() {
+        return epoch() + ChronoDuration::milliseconds(ms);
+    }
+    for fmt in ["%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"] {
+        if let Ok(dt) = NaiveDateTime::parse_from_str(s, fmt) {
+            return dt;
+        }
+    }
+    tracing::warn!(input = s, "unrecognized time format, using latest");
+    latest_or_now(graph)
+}
+
+fn latest_or_now(graph: &TemporalGraph) -> NaiveDateTime {
+    let mut latest: Option<NaiveDateTime> = None;
+    for e in graph.edges() {
+        for iv in e.intervals.iter() {
+            latest = Some(match latest {
+                Some(prev) if prev >= iv.end_time => prev,
+                _ => iv.end_time,
+            });
+        }
+    }
+    latest.unwrap_or_else(|| chrono::Utc::now().naive_utc())
+}
+
+fn epoch() -> NaiveDateTime {
+    chrono::NaiveDate::from_ymd_opt(1970, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
 }

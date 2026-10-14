@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>GraphStream Visualizer</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; background: #0e1116; color: #e6e6e6; }
+        #network { position: absolute; top: 96px; left: 0; right: 0; bottom: 0; }
+        #bar {
+            position: absolute; top: 0; left: 0; right: 0; height: 96px;
+            background: #161b22; box-shadow: 0 1px 6px rgba(0,0,0,0.6);
+            display: grid; grid-template-columns: 1fr; grid-template-rows: 48px 48px;
+            padding: 0 16px; gap: 0; z-index: 2;
+        }
+        .row { display: flex; align-items: center; gap: 12px; }
+        .row input[type=range] { flex: 1; accent-color: #2a6df4; }
+        .btn {
+            background: #21262d; color: #e6e6e6; border: 1px solid #30363d;
+            padding: 6px 12px; border-radius: 4px; cursor: pointer;
+            font: inherit; font-size: 13px;
+        }
+        .btn:hover { background: #30363d; }
+        .btn.active { background: #2a6df4; border-color: #2a6df4; }
+        .pill {
+            background: #21262d; border: 1px solid #30363d;
+            padding: 4px 8px; border-radius: 999px; font-size: 12px;
+        }
+        .pill.connected { color: #3fb950; border-color: #2ea043; }
+        .pill.disconnected { color: #f85149; border-color: #da3633; }
+        select { background: #21262d; color: inherit; border: 1px solid #30363d;
+            padding: 5px; border-radius: 4px; font: inherit; font-size: 13px; }
+        code { background: #21262d; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+        #meta { font-size: 12px; opacity: 0.75; }
+        #time { font-family: ui-monospace, monospace; font-size: 13px; min-width: 180px; }
+    </style>
+</head>
+<body>
+<div id="bar">
+    <div class="row">
+        <button class="btn" id="mode-live">Live</button>
+        <button class="btn" id="mode-playback">Playback</button>
+        <button class="btn" id="play-pause">▶ Play</button>
+        <select id="speed">
+            <option value="1">1×</option>
+            <option value="10">10×</option>
+            <option value="100" selected>100×</option>
+            <option value="1000">1000×</option>
+            <option value="10000">10000×</option>
+        </select>
+        <label class="pill"><input type="checkbox" id="loop" checked> Loop</label>
+        <span class="pill connected" id="conn">connecting</span>
+        <span id="meta"></span>
+    </div>
+    <div class="row">
+        <span id="time">—</span>
+        <input type="range" id="slider" min="0" max="1000" value="0">
+        <span class="pill" id="range"></span>
+    </div>
+</div>
+<div id="network"></div>
+
+<script>
+    const API = {
+        events:    "/events",
+        meta:      "/meta",
+        control:   "/control",
+    };
+
+    // ---- graph -----------------------------------------------------------
+    const nodes = new vis.DataSet([]);
+    const edges = new vis.DataSet([]);
+    const net = new vis.Network(
+        document.getElementById("network"),
+        { nodes, edges },
+        {
+            nodes: { font: { size: 13, color: "#e6e6e6" }, shape: "dot", size: 12,
+                color: { background: "#2a6df4", border: "#1e57c9" } },
+            edges: { arrows: "to", color: { color: "#8b949e", highlight: "#2a6df4" },
+                smooth: { type: "dynamic" }, width: 1 },
+            physics: { stabilization: { iterations: 80 }, barnesHut: { gravitationalConstant: -8000 } },
+            interaction: { hover: true, dragNodes: true },
+        }
+    );
+
+    let seenNodes = new Set();
+    let seenEdges = new Set();
+
+    // ---- state -----------------------------------------------------------
+    let state = {
+        mode: "playback",
+        playing: false,
+        speed: 100,
+        loop_: true,
+        virtual_time_ms: 0,
+        from_ms: 0,
+        to_ms: 0,
+    };
+
+    // ---- controls --------------------------------------------------------
+    const $ = id => document.getElementById(id);
+    const slider = $("slider");
+    const speedSel = $("speed");
+    const loopChk = $("loop");
+    const playBtn = $("play-pause");
+    const modeLive = $("mode-live");
+    const modePb = $("mode-playback");
+    const connEl = $("conn");
+
+    function sendControl(action) {
+        fetch(API.control, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(action),
+        }).then(r => r.json()).then(applyState).catch(() => {});
+    }
+
+    $("mode-live").addEventListener("click", () => sendControl({ action: "set_mode", mode: "live" }));
+    $("mode-playback").addEventListener("click", () => sendControl({ action: "set_mode", mode: "playback" }));
+    playBtn.addEventListener("click", () => {
+        sendControl({ action: state.playing ? "pause" : "play" });
+    });
+    speedSel.addEventListener("change", () => {
+        sendControl({ action: "set_speed", value: parseFloat(speedSel.value) });
+    });
+    loopChk.addEventListener("change", () => {
+        sendControl({ action: "set_loop", value: loopChk.checked });
+    });
+    slider.addEventListener("input", () => {
+        // Preview while dragging.
+        $("time").textContent = fmtTime(parseInt(slider.value, 10));
+    });
+    slider.addEventListener("change", () => {
+        sendControl({ action: "seek", t_ms: parseInt(slider.value, 10) });
+    });
+
+    // ---- state rendering -------------------------------------------------
+    function applyState(s) {
+        state = s;
+        modeLive.classList.toggle("active", s.mode === "live");
+        modePb.classList.toggle("active", s.mode === "playback");
+        playBtn.textContent = s.playing ? "⏸ Pause" : "▶ Play";
+        playBtn.disabled = s.mode === "live";
+        speedSel.value = String(s.speed);
+        loopChk.checked = s.loop_;
+
+        slider.min = s.from_ms;
+        slider.max = s.to_ms;
+        if (document.activeElement !== slider) {
+            slider.value = s.virtual_time_ms;
+        }
+        $("time").textContent = fmtTime(s.virtual_time_ms);
+        $("range").textContent = `${fmtTime(s.from_ms)} → ${fmtTime(s.to_ms)}`;
+    }
+
+    function fmtTime(ms) {
+        if (!ms) return "—";
+        const d = new Date(ms);
+        return d.toISOString().replace("T", " ").replace("Z", "");
+    }
+
+    // ---- graph rendering -------------------------------------------------
+    function renderSnapshot(snap) {
+        const liveNodeIds = new Set(snap.nodes.map(n => n.id));
+        const liveEdgeKeys = new Set(snap.edges.map(e => `${e.source}->${e.target}:${e.start_ms}`));
+
+        // Remove nodes/edges that are no longer active.
+        const toRemoveNodes = [];
+        seenNodes.forEach(id => { if (!liveNodeIds.has(id)) toRemoveNodes.push(id); });
+        const toRemoveEdges = [];
+        seenEdges.forEach(k => { if (!liveEdgeKeys.has(k)) toRemoveEdges.push(k); });
+        if (toRemoveNodes.length) nodes.remove(toRemoveNodes);
+        if (toRemoveEdges.length) edges.remove(toRemoveEdges);
+
+        // Add or update.
+        const vnodes = snap.nodes.map(n => ({
+            id: n.id,
+            label: `${n.label}\n#${n.id}`,
+        }));
+        nodes.update(vnodes);
+
+        const vedges = snap.edges.map(e => ({
+            id: `${e.source}->${e.target}:${e.start_ms}`,
+            from: e.source,
+            to: e.target,
+            label: e.label,
+        }));
+        edges.update(vedges);
+
+        seenNodes = liveNodeIds;
+        seenEdges = liveEdgeKeys;
+
+        $("meta").textContent =
+            `${snap.nodes.length} active / ${snap.total_nodes} total nodes · ` +
+            `${snap.edges.length} active / ${snap.total_edges} total edges`;
+
+        if (document.activeElement !== slider) {
+            slider.value = snap.time_ms;
+        }
+        $("time").textContent = snap.time_display;
+    }
+
+    // ---- SSE connection --------------------------------------------------
+    let es = null;
+
+    function connect() {
+        if (es) es.close();
+        es = new EventSource(API.events);
+
+        es.addEventListener("open", () => {
+            connEl.textContent = "connected";
+            connEl.classList.add("connected");
+            connEl.classList.remove("disconnected");
+        });
+
+        es.addEventListener("error", () => {
+            connEl.textContent = "reconnecting";
+            connEl.classList.remove("connected");
+            connEl.classList.add("disconnected");
+        });
+
+        es.addEventListener("meta", ev => {
+            try { applyState(JSON.parse(ev.data)); } catch (e) { console.error(e); }
+        });
+
+        es.addEventListener("snapshot", ev => {
+            try { renderSnapshot(JSON.parse(ev.data)); } catch (e) { console.error(e); }
+        });
+    }
+
+    // ---- boot ------------------------------------------------------------
+    fetch(API.meta).then(r => r.json()).then(applyState).catch(() => {});
+    connect();
+</script>
+</body>
+</html>
