@@ -1,7 +1,19 @@
 target/
 
 /doc/Resources
+**/target/
+Cargo.lock
 
+# Editors
+.idea/
+
+
+# OS
+.DS_Store
+Thumbs.db
+
+# REPL history
+.graphstream_history
 # Secrets — never commit these
 *.secret
 *.secrets
