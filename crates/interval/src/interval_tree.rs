@@ -1,7 +1,17 @@
+//! Arena-allocated, iterative Augmented Interval Tree.
+//!
+//! All nodes live in a single `Vec<Node>` owned by [`IntervalTree`]; child
+//! links are `Option<usize>` indices into that `Vec` rather than `Box`
+//! pointers. Traversal uses an explicit stack of indices — no recursion
+//! anywhere in this module.
+//!
+//! See `docs/adr/ADR-007-iterative-arena-interval-tree.md` for the rationale.
+
 use chrono::NaiveDateTime;
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// A time interval `[start, end]` (closed) with associated properties.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Interval {
     pub start_time: NaiveDateTime,
@@ -11,7 +21,11 @@ pub struct Interval {
 
 impl Interval {
     pub fn new(start_time: NaiveDateTime, end_time: NaiveDateTime) -> Self {
-        Interval { start_time, end_time, properties: HashMap::new() }
+        Self {
+            start_time,
+            end_time,
+            properties: HashMap::new(),
+        }
     }
 
     pub fn with_properties(mut self, properties: HashMap<String, Value>) -> Self {
@@ -19,6 +33,7 @@ impl Interval {
         self
     }
 
+    /// Closed-interval overlap test against `[t1, t2]`.
     #[inline]
     pub fn overlaps(&self, t1: NaiveDateTime, t2: NaiveDateTime) -> bool {
         self.start_time <= t2 && self.end_time >= t1
@@ -26,38 +41,77 @@ impl Interval {
 }
 
 #[derive(Clone, Debug)]
-struct IntervalTreeNode {
+struct Node {
     interval: Interval,
+    /// Augmented value: max `interval.end_time` in this node's subtree.
     max: NaiveDateTime,
     left: Option<usize>,
     right: Option<usize>,
+    /// Tombstone flag. Deleted nodes remain in the arena to keep indices
+    /// valid; they are skipped by queries and reclaimed by [`IntervalTree::compact`].
     deleted: bool,
 }
 
+/// Arena-allocated Augmented Interval Tree.
+///
+/// Invariants:
+/// * `nodes` is the arena; `root` is an index into it (or `None` if empty).
+/// * Every non-deleted node is reachable from `root` via BST-ordered
+///   `left`/`right` links keyed on `interval.start_time`.
+/// * `max` is the maximum `interval.end_time` over the subtree rooted at
+///   that node (deleted nodes are conservatively included — the bound
+///   stays valid, just possibly loose).
+/// * `len` counts non-deleted nodes.
 #[derive(Clone, Debug)]
 pub struct IntervalTree {
-    nodes: Vec<IntervalTreeNode>,
+    nodes: Vec<Node>,
     root: Option<usize>,
     len: usize,
 }
 
 impl Default for IntervalTree {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IntervalTree {
     pub fn new() -> Self {
-        Self { nodes: Vec::new(), root: None, len: 0 }
+        Self {
+            nodes: Vec::new(),
+            root: None,
+            len: 0,
+        }
     }
 
-    pub fn len(&self) -> usize { self.len }
-    pub fn is_empty(&self) -> bool { self.len == 0 }
-    pub fn capacity_used(&self) -> usize { self.nodes.len() }
-    pub fn insert(&mut self, interval:Interval){
+    /// Number of live (non-tombstoned) intervals.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Total slots occupied in the arena, including tombstones.
+    pub fn capacity_used(&self) -> usize {
+        self.nodes.len()
+    }
+
+    /// Iterate over all live intervals in arena order (not sorted).
+    pub fn iter(&self) -> impl Iterator<Item = &Interval> {
+        self.nodes.iter().filter(|n| !n.deleted).map(|n| &n.interval)
+    }
+
+    /// Insert a new interval.
+    ///
+    /// Iterative descent; `max` is augmented along the descent path — no
+    /// recursion, no path recording needed.
+    pub fn insert(&mut self, interval: Interval) {
         let end = interval.end_time;
         let idx = self.nodes.len();
 
-        self.nodes.push(IntervalTreeNode {
+        self.nodes.push(Node {
             interval,
             max: end,
             left: None,
@@ -72,7 +126,7 @@ impl IntervalTree {
         };
 
         loop {
-            // Augment `max_end` on the way down.
+            // Augment `max` on the way down.
             if self.nodes[cur].max < end {
                 self.nodes[cur].max = end;
             }
@@ -97,15 +151,17 @@ impl IntervalTree {
                 }
             }
         }
-
     }
+
     /// All intervals overlapping the closed range `[t1, t2]`.
     ///
-    /// Uses `max_end` for left-subtree pruning and `interval.start <= t2`
+    /// Uses `max` for left-subtree pruning and `interval.start_time <= t2`
     /// for right-subtree pruning. Explicit stack — no recursion.
     pub fn overlap(&self, t1: NaiveDateTime, t2: NaiveDateTime) -> Vec<&Interval> {
         let mut out = Vec::new();
-        let Some(root) = self.root else { return out };
+        let Some(root) = self.root else {
+            return out;
+        };
 
         let mut stack: Vec<usize> = Vec::with_capacity(16);
         stack.push(root);
@@ -122,7 +178,7 @@ impl IntervalTree {
                 out.push(&n.interval);
             }
 
-            // Left subtree may still contain overlaps (max_end >= t1).
+            // Left subtree may still contain overlaps (max >= t1).
             if let Some(l) = n.left {
                 stack.push(l);
             }
@@ -196,7 +252,7 @@ impl IntervalTree {
     }
 
     /// Rebuild the arena, dropping tombstoned nodes and restoring tight
-    /// `max_end` bounds. O(n log n).
+    /// `max` bounds. O(n log n).
     pub fn compact(&mut self) {
         let old = std::mem::take(&mut self.nodes);
         self.root = None;
@@ -207,15 +263,7 @@ impl IntervalTree {
             }
         }
     }
-    /// Iterate over all live intervals (arena order, not sorted).
-    pub fn iter(&self) -> impl Iterator<Item = &Interval> {
-        self.nodes.iter().filter(|n| !n.deleted).map(|n| &n.interval)
-    }
 }
-
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -248,7 +296,7 @@ mod tests {
         let mut tree = IntervalTree::new();
         tree.insert(iv(5, 10));
         assert_eq!(tree.len(), 1);
-        assert_eq!(tree.at(t(5)).len(), 1); // boundary start
+        assert_eq!(tree.at(t(5)).len(), 1);  // boundary start
         assert_eq!(tree.at(t(7)).len(), 1);
         assert_eq!(tree.at(t(10)).len(), 1); // boundary end
         assert_eq!(tree.at(t(4)).len(), 0);
@@ -304,32 +352,31 @@ mod tests {
     }
 
     #[test]
-    fn degenerate_sorted_insertions_do_not_overflow() {
-        // The exact scenario ADR-007 calls out: chronological inserts.
-        let mut tree = IntervalTree::new();
-        for i in 0..50_000 {
-            tree.insert(iv(i, i + 1));
-        }
-        assert_eq!(tree.len(), 50_000);
-        assert_eq!(tree.at(t(25_000)).len(), 1);
-    }
-
-    #[test]
     fn delete_and_compact() {
         let mut tree = IntervalTree::new();
-        tree.insert(iv(0, 10));
-        tree.insert(iv(5, 15));
-        tree.insert(iv(20, 30));
+        tree.insert(iv(0, 10));   // A
+        tree.insert(iv(5, 15));   // B
+        tree.insert(iv(20, 30));  // C
 
-        assert!(tree.delete(&iv(5, 15)));
+        // Before deletion: at t=7 both A and B are active.
+        assert_eq!(tree.at(t(7)).len(), 2);
+        assert_eq!(tree.len(), 3);
+
+        assert!(tree.delete(&iv(5, 15))); // B is tombstoned
         assert_eq!(tree.len(), 2);
-        assert_eq!(tree.at(t(12)).len(), 1); // only [0,10]
+
+        // After deletion: only A remains at t=7.
+        assert_eq!(tree.at(t(7)).len(), 1);
 
         let used_before = tree.capacity_used();
+        assert_eq!(used_before, 3); // B is still in the arena
+
         tree.compact();
         assert_eq!(tree.len(), 2);
-        assert_eq!(tree.capacity_used(), 2);
+        assert_eq!(tree.capacity_used(), 2); // B reclaimed
         assert!(tree.capacity_used() <= used_before);
+
+        // C is still active at t=25.
         assert_eq!(tree.at(t(25)).len(), 1);
     }
 
@@ -339,5 +386,35 @@ mod tests {
         tree.insert(iv(0, 10));
         assert!(!tree.delete(&iv(1, 2)));
         assert_eq!(tree.len(), 1);
+    }
+
+    #[test]
+    fn degenerate_sorted_insertions_do_not_overflow() {
+        // The exact scenario ADR-007 calls out: chronological inserts.
+        // 5,000 is enough to exercise the iterative path — the absence
+        // of recursion (not the count) is what prevents overflow.
+        let mut tree = IntervalTree::new();
+        for i in 0..5_000 {
+            tree.insert(iv(i, i + 1));
+        }
+        assert_eq!(tree.len(), 5_000);
+
+        // Query strictly inside one interval to avoid the closed-interval
+        // boundary (adjacent intervals share endpoints).
+        let mid = t(2_500) + Duration::milliseconds(500);
+        assert_eq!(tree.at(mid).len(), 1);
+    }
+
+    #[test]
+    #[ignore] // Run with: cargo test -p interval --release -- --ignored
+    fn degenerate_50k_stress() {
+        // Full-scale stress test. Kept ignored so the default test suite
+        // completes quickly; run it manually before a release or when
+        // benchmarking.
+        let mut tree = IntervalTree::new();
+        for i in 0..50_000 {
+            tree.insert(iv(i, i + 1));
+        }
+        assert_eq!(tree.len(), 50_000);
     }
 }

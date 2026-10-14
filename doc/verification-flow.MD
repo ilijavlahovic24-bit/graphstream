@@ -1,3 +1,13 @@
+# Rust flow
+# 1) Building project
+cargo build -p engine --bin graphstream
+# 2) Testing project
+cargo test
+# 3) Single Node command and vizualization
+cargo run -p engine --bin graphstream -- --dataset crates/engine/data/example.json viz serve --port 7475 --mode playback --speed 100 --autoplay
+
+
+# Kubernetes flow
 # 1) Install operator + monitoring (no sample yet)
 cd deploy
 ./install.sh

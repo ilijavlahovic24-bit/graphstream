@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Kafka connection parameters that shard pods use to consume events.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct KafkaSpec {
     /// Comma-separated broker addresses, e.g. `"kafka.default.svc:9092"`.
     pub brokers: String,
