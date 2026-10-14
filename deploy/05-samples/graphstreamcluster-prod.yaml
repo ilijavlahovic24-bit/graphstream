@@ -1,0 +1,18 @@
+apiVersion: graphstream.io/v1alpha1
+kind: GraphStreamCluster
+metadata:
+  name: prod
+  namespace: graphstream-clusters
+spec:
+  shards: 8
+  replicationFactor: 3
+  memoryLimitMb: 4096
+  cpuRequestMillicores: 2000
+  shardWindowSeconds: 3600
+  allowedLatenessMs: 30000
+  image: graphstream/shard:0.1.0
+  kafka:
+    brokers: "kafka-0.messaging.svc.cluster.local:9093,kafka-1.messaging.svc.cluster.local:9093,kafka-2.messaging.svc.cluster.local:9093"
+    topic: "graphstream.events.prod"
+    groupId: "graphstream-prod"
+    credentialsSecret: graphstream-kafka-credentials

@@ -1,13 +1,13 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: graphstream-shards
-  namespace: default
+  name: graphstream-shards-minimal
+  namespace: graphstream-clusters
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: StatefulSet
-    name: demo   # matches the GraphStreamCluster name
+    name: minimal
   minReplicas: 2
   maxReplicas: 32
   behavior:
@@ -27,8 +27,8 @@ spec:
         - type: Percent
           value: 25
           periodSeconds: 60
+      selectPolicy: Max
   metrics:
-    # Scale up if ingest exceeds 5000 events/second per pod.
     - type: Pods
       pods:
         metric:
@@ -36,7 +36,6 @@ spec:
         target:
           type: AverageValue
           averageValue: 5000
-    # Scale up if p99 query latency exceeds 250 ms.
     - type: Pods
       pods:
         metric:

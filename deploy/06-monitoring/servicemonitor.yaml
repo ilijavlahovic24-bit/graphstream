@@ -1,0 +1,40 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: graphstream-shards
+  namespace: graphstream-clusters
+  labels:
+    app.kubernetes.io/name: graphstream
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames: [graphstream-clusters]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: graphstream
+      app.kubernetes.io/component: shard
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphstream-shard-metrics
+  namespace: graphstream-clusters
+  labels:
+    app.kubernetes.io/name: graphstream
+    app.kubernetes.io/component: shard
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: graphstream
+    app.kubernetes.io/component: shard
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP

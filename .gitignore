@@ -2,3 +2,4 @@ target/
 
 /doc/Resources
 
+deploy/02-secrets/ *.yaml

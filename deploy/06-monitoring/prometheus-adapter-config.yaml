@@ -3,10 +3,11 @@ kind: ConfigMap
 metadata:
   name: prometheus-adapter-config
   namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-adapter
 data:
   config.yaml: |
     rules:
-      # Ingest rate: events per second, averaged over 1m, per shard pod.
       - seriesQuery: 'graphstream_shard_events_ingested_total{namespace!="",pod!=""}'
         resources:
           overrides:
@@ -18,7 +19,6 @@ data:
         metricsQuery: |
           sum(rate(<<.Series>>{<<.LabelMatchers>>}[1m])) by (<<.GroupBy>>)
 
-      # Query p99 latency across all shards.
       - seriesQuery: 'graphstream_query_duration_seconds_bucket{namespace!="",pod!=""}'
         resources:
           overrides:

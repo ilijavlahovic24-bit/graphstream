@@ -1,0 +1,17 @@
+apiVersion: graphstream.io/v1alpha1
+kind: GraphStreamCluster
+metadata:
+  name: minimal
+  namespace: graphstream-clusters
+spec:
+  shards: 2
+  replicationFactor: 1
+  memoryLimitMb: 512
+  cpuRequestMillicores: 250
+  shardWindowSeconds: 600
+  allowedLatenessMs: 5000
+  image: graphstream/shard:0.1.0
+  kafka:
+    brokers: "kafka.messaging.svc.cluster.local:9092"
+    topic: "graphstream.events"
+    groupId: "graphstream-minimal"

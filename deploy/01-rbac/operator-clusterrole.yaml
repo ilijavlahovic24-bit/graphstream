@@ -1,0 +1,41 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: graphstream-operator
+  labels:
+    app.kubernetes.io/name: graphstream-operator
+rules:
+  # Custom resource and its status subresource.
+  - apiGroups: ["graphstream.io"]
+    resources: ["graphstreamclusters", "graphstreamclusters/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Owned child resources.
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - apiGroups: [""]
+    resources: ["services", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Read-only on secrets: the operator attaches them to pod env vars but
+  # does not create or mutate them.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+
+  # Pods: read-only, for readiness reporting in `.status`.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Events: the operator emits events on state transitions.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+  # Optional: read HPA and ServiceMonitor state for diagnostics.
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
