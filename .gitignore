@@ -2,4 +2,26 @@ target/
 
 /doc/Resources
 
-deploy/02-secrets/ *.yaml
+# Secrets — never commit these
+*.secret
+*.secrets
+secrets/
+.env
+.env.*
+!.env.example
+
+# Kubernetes credentials (only the .example template is committed)
+deploy/02-secrets/*.yaml
+!deploy/02-secrets/*.example.yaml
+
+# Kafka credentials
+kafka-credentials.yaml
+**/kafka-credentials.yaml
+
+# TLS / SSH keys
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
