@@ -1,6 +1,6 @@
 # GraphStream: A Temporal Graph Query Engine with TQL
 
-## Status: v1 Complete - v2 In Progress
+## Status: Completed
 
 ## Overview
 GraphStream is a temporal graph query engine written in Rust, focused on expressing and evaluating complex time-evolving relationship patterns. It introduces the Temporal Query Language (TQL) — a declarative query language that combines Cypher-style graph traversal with SQL-style filtering and temporal operators as first-class constructs.
@@ -123,7 +123,7 @@ RETURN parent, SUM(child.energy) AS total_energy
 - Kafka consumer with documented JSON schema and idempotent writes
 - Backpressure mechanism for ingest rate control
 
-### v3 - Production deployment (Planned)
+### v3 - Production deployment (Complete)
 - Kubernetes operator with GraphStreamCluster CRD
 - Reconciliation loop for lifecycle management (scale, update, heal)
 - Horizontal Pod Autoscaler driven by custom metrics (ingest rate, query latency, watermark lag)
